@@ -1,7 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
-using UnityEditor;
 using UnityEngine;
+using System;
 
 public class BaseScript : MonoBehaviour
 {
@@ -11,6 +11,35 @@ public class BaseScript : MonoBehaviour
     public GameObject building;
 
     public static int credits = 3000;
+    public static event Action<int> CreditsChanged;
+
+    public static bool HasCredits(int amount)
+    {
+        return credits >= amount;
+    }
+
+    public static bool TrySpendCredits(int amount)
+    {
+        if (!HasCredits(amount))
+        {
+            return false;
+        }
+
+        SetCredits(credits - amount);
+        return true;
+    }
+
+    public static void AddCredits(int amount)
+    {
+        SetCredits(credits + amount);
+    }
+
+    private static void SetCredits(int amount)
+    {
+        credits = Mathf.Max(0, amount);
+        CreditsChanged?.Invoke(credits);
+    }
+
     // Method to increase the radius
     private void Update()
     {
@@ -28,12 +57,22 @@ public class BaseScript : MonoBehaviour
 
     private void UpdateRadiusVisual()
     {
+         if (raidusIndicator == null || terrainMaterial == null)
+         {
+             return;
+         }
+
          raidusIndicator.transform.localScale = new Vector3(placementRadius, placementRadius / 100, placementRadius);
          terrainMaterial.SetFloat("_Radius", placementRadius/5);
     }
 
     private void OnDrawGizmos()
     {
+        if (building == null)
+        {
+            return;
+        }
+
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(building.transform.position, placementRadius * 100);
     }

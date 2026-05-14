@@ -2,22 +2,41 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 public class BaseUIScript : MonoBehaviour
 {
     // Start is called before the first frame update
     public GameObject hologramGeneratorPrefab; 
     public GameObject hologramAttackerPrefab; 
+    public TextMeshProUGUI creditsText;
     private GameObject currentHologram;
+
+    private void OnEnable()
+    {
+        BaseScript.CreditsChanged += HandleCreditsChanged;
+        HandleCreditsChanged(BaseScript.credits);
+    }
+
+    private void OnDisable()
+    {
+        BaseScript.CreditsChanged -= HandleCreditsChanged;
+    }
 
 
     void PurchaseTurret(GameObject turretPrefab, GameObject hologramPrefab, int cost, SlotHolder slot)
     {
-        if (BaseScript.credits >= cost)
+        if (BaseScript.TrySpendCredits(cost))
         {
-            BaseScript.credits -= cost;
-            
             EnterPlacementMode(hologramPrefab);
+        }
+    }
+
+    private void HandleCreditsChanged(int credits)
+    {
+        if (creditsText != null)
+        {
+            creditsText.text = $"Credits: {credits}";
         }
     }
 

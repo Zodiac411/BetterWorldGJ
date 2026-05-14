@@ -16,9 +16,11 @@ public class GeneratorLogic : MonoBehaviour
     private void Awake()
     {
         Tbase = GameObject.FindGameObjectWithTag("Base");
-        baseScript = Tbase.GetComponent<BaseScript>();
-        
-        baseScript.AddGeneratorRadius();
+        if (Tbase != null)
+        {
+            baseScript = Tbase.GetComponent<BaseScript>();
+            baseScript?.AddGeneratorRadius();
+        }
     }
 
     private void OnDestroy()
@@ -26,12 +28,16 @@ public class GeneratorLogic : MonoBehaviour
         
         if (isdead)  
         {
-            baseScript.RemoveGeneratorRadius();
+            baseScript?.RemoveGeneratorRadius();
         }
     }
     void Update()
     {
-        
+        if (rotatingPiece == null)
+        {
+            return;
+        }
+
         rotatingPiece.transform.Rotate(Vector3.forward, rotationSpeed * Time.deltaTime);
 
         
@@ -46,6 +52,12 @@ public class GeneratorLogic : MonoBehaviour
     IEnumerator MovePiece()
     {
         isMoving = true;
+
+        if (rotatingPiece == null)
+        {
+            isMoving = false;
+            yield break;
+        }
 
        
         Vector3 startPosition = rotatingPiece.transform.position;
@@ -67,7 +79,7 @@ public class GeneratorLogic : MonoBehaviour
             //print(BaseScript.credits);
             yield return null;
         }
-        BaseScript.credits += 12;
+        BaseScript.AddCredits(12);
         print(BaseScript.credits);
 
         rotatingPiece.transform.position = startPosition;
