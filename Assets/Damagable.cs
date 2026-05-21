@@ -1,40 +1,31 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
-public class Damagable : MonoBehaviour
+public class Damagable : MonoBehaviour, IDamageable
 {
-    [SerializeField] private float _initialHealth;
-    public float _currentHealth;
-    // Start is called before the first frame update
-    void Start()
-    {
-        
-    }
+    [SerializeField] private float initialHealth = 100f;
+    private float currentHealth;
+
     private void Awake()
     {
-        _currentHealth = _initialHealth;
+        currentHealth = initialHealth;
+    }
+
+    public void ApplyDamage(in DamageContext context)
+    {
+        if (currentHealth <= 0f)
+        {
+            return;
+        }
+
+        currentHealth -= context.TotalDamage;
+        if (currentHealth <= 0f)
+        {
+            Destroy(gameObject);
+        }
     }
 
     public void ApplyDamage(float damage)
     {
-        if (_currentHealth <= 0) return;
-        _currentHealth -= damage;
-
-
-        if (_currentHealth <= 0)
-        {
-            Destruct();
-        }
-    }
-    // Update is called once per frame
-    void Update()
-    {
-        
-    }
-
-    private void Destruct()
-    {
-        Destroy(gameObject);
+        ApplyDamage(new DamageContext(damage, gameObject));
     }
 }

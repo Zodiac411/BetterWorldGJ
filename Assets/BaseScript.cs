@@ -1,69 +1,111 @@
-using System.Collections;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
-using System;
 
 public class BaseScript : MonoBehaviour
 {
-    public float placementRadius = 0.1f; 
+    [SerializeField] private EconomyService economyService;
+
+    private static readonly List<Action<int>> PendingCreditsHandlers = new List<Action<int>>();
+
+    public float placementRadius = 0.1f;
     public GameObject raidusIndicator;
     public Material terrainMaterial;
     public GameObject building;
 
-    public static int credits = 3000;
-    public static event Action<int> CreditsChanged;
+    public static EconomyService Economy => EconomyService.Instance;
+
+    public static int credits => Economy != null ? Economy.Credits : 0;
+
+    public static event Action<int> CreditsChanged
+    {
+        add
+        {
+            if (Economy != null)
+            {
+                Economy.CreditsChanged += value;
+            }
+            else if (value != null && !PendingCreditsHandlers.Contains(value))
+            {
+                PendingCreditsHandlers.Add(value);
+            }
+        }
+        remove
+        {
+            if (Economy != null)
+            {
+                Economy.CreditsChanged -= value;
+            }
+
+            PendingCreditsHandlers.Remove(value);
+        }
+    }
 
     public static bool HasCredits(int amount)
     {
-        return credits >= amount;
+        return Economy != null && Economy.HasCredits(amount);
     }
 
     public static bool TrySpendCredits(int amount)
     {
-        if (!HasCredits(amount))
-        {
-            return false;
-        }
-
-        SetCredits(credits - amount);
-        return true;
+        return Economy != null && Economy.TrySpendCredits(amount);
     }
 
     public static void AddCredits(int amount)
     {
-        SetCredits(credits + amount);
+        Economy?.AddCredits(amount);
     }
 
-    private static void SetCredits(int amount)
+    private void Awake()
     {
-        credits = Mathf.Max(0, amount);
-        CreditsChanged?.Invoke(credits);
+        if (economyService == null)
+        {
+            economyService = GetComponent<EconomyService>();
+        }
+
+        if (economyService == null)
+        {
+            economyService = gameObject.AddComponent<EconomyService>();
+        }
+
+        BindPendingCreditsHandlers();
     }
 
-    // Method to increase the radius
+    public static void BindPendingCreditsHandlers()
+    {
+        if (Economy == null || PendingCreditsHandlers.Count == 0)
+        {
+            return;
+        }
+
+        for (int i = 0; i < PendingCreditsHandlers.Count; i++)
+        {
+            Economy.CreditsChanged += PendingCreditsHandlers[i];
+        }
+
+        PendingCreditsHandlers.Clear();
+    }
+
     private void Update()
     {
         UpdateRadiusVisual();
     }
+
     public void IncreasePlacementRadius(float amount)
     {
         placementRadius += amount;
-        print(placementRadius);
         UpdateRadiusVisual();
-
     }
-
-    
 
     private void UpdateRadiusVisual()
     {
-         if (raidusIndicator == null || terrainMaterial == null)
-         {
-             return;
-         }
+        if (raidusIndicator == null || terrainMaterial == null)
+        {
+            return;
+        }
 
-         raidusIndicator.transform.localScale = new Vector3(placementRadius, placementRadius / 100, placementRadius);
-         terrainMaterial.SetFloat("_Radius", placementRadius/5);
+        raidusIndicator.transform.localScale = new Vector3(placementRadius, placementRadius / 100f, placementRadius);
+        terrainMaterial.SetFloat("_Radius", placementRadius / 5f);
     }
 
     private void OnDrawGizmos()
@@ -74,17 +116,15 @@ public class BaseScript : MonoBehaviour
         }
 
         Gizmos.color = Color.red;
-        Gizmos.DrawWireSphere(building.transform.position, placementRadius * 100);
+        Gizmos.DrawWireSphere(building.transform.position, placementRadius * 100f);
     }
 
     public void AddGeneratorRadius()
     {
         placementRadius += 0.01f;
-        //UpdateRadiusVisual();
         Debug.Log("Generator placed. New radius: " + placementRadius);
     }
 
-    
     public void RemoveGeneratorRadius()
     {
         placementRadius -= 0.3f;

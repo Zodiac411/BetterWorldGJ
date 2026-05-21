@@ -1,82 +1,104 @@
-    using System.Collections;
-    using System.Collections.Generic;
-    using UnityEngine;
+using UnityEngine;
 
-    public class buildManager : MonoBehaviour
-    {
+public class buildManager : MonoBehaviour
+{
     public GameObject buildUI;
-    public GameObject generatorHologramPrefab;
-    public GameObject attackerHologramPrefab;
+    [SerializeField] private TurretData generatorDefinition;
+    [SerializeField] private TurretData attackerDefinition;
+    [SerializeField] private GameObject generatorHologramPrefab;
+    [SerializeField] private GameObject attackerHologramPrefab;
     public TowerLogic towerLogic;
+
     private BuildFlowMediator buildFlowMediator;
-    void Start()
+
+    private void Start()
     {
-        towerLogic = GetComponent<TowerLogic>();
+        if (towerLogic == null)
+        {
+            towerLogic = GetComponent<TowerLogic>();
+        }
+
+        EnsureLegacyHologramLinks();
+
         buildFlowMediator = new BuildFlowMediator(
             buildUI,
-            generatorHologramPrefab,
-            attackerHologramPrefab,
+            generatorDefinition,
+            attackerDefinition,
             towerLogic,
             new DefaultBuildPlacementFactory());
     }
 
-        void Update()
+    private void EnsureLegacyHologramLinks()
+    {
+        if (generatorDefinition != null && generatorDefinition.hologramPrefab == null)
         {
-            if (Input.GetKeyDown(KeyCode.Tab))
-            {
-                Debug.Log("Toggled build mode.");
-                ToggleBuildMode();
-            }
-
-            if (buildFlowMediator.IsBuildModeActive)
-            {
-                Camera playerCamera = Camera.main;
-                if (playerCamera == null)
-                {
-                    return;
-                }
-
-                Ray ray = playerCamera.ScreenPointToRay(Input.mousePosition);
-                RaycastHit hit;
-                if (Physics.Raycast(ray, out hit, Mathf.Infinity, LayerMask.GetMask("Ground")))
-                {
-                    buildFlowMediator.UpdatePreviewPosition(hit.point);
-
-                    if (Input.GetKeyDown(KeyCode.Q))
-                    {
-                        Debug.Log("Q pressed for generator.");
-                        buildFlowMediator.TryStartGeneratorPlacement();
-                    }
-                    else if (Input.GetKeyDown(KeyCode.E))
-                    {
-                        Debug.Log("E pressed for attacker.");
-                        buildFlowMediator.TryStartAttackerPlacement();
-                    }
-                    else if (Input.GetMouseButtonDown(0))
-                    {
-                        Debug.Log("Attempting to place turret.");
-                        PlaceTurret();
-                    }
-                }
-                else
-                {
-                    Debug.Log("Raycast did not hit the ground layer.");
-                }
-            }
+            generatorDefinition.hologramPrefab = generatorHologramPrefab;
         }
 
-    void ToggleBuildMode()
+        if (attackerDefinition != null && attackerDefinition.hologramPrefab == null)
+        {
+            attackerDefinition.hologramPrefab = attackerHologramPrefab;
+        }
+    }
+
+    private void Update()
     {
-        buildFlowMediator.ToggleBuildMode();
+        if (Input.GetKeyDown(KeyCode.Tab))
+        {
+            buildFlowMediator.ToggleBuildMode();
+        }
+
+        if (!buildFlowMediator.IsBuildModeActive)
+        {
+            return;
+        }
+
+        buildFlowMediator.ProcessBuildInput(
+            Camera.main,
+            Input.mousePosition,
+            Input.GetKeyDown(KeyCode.Q),
+            Input.GetKeyDown(KeyCode.E),
+            Input.GetMouseButtonDown(0));
     }
 
     public void StartBuilding(GameObject hologramPrefab, int cost)
     {
-        buildFlowMediator.TryStartBuilding(hologramPrefab, cost);
+        TurretData definition = ResolveDefinitionForHologram(hologramPrefab, cost);
+        if (definition != null)
+        {
+            buildFlowMediator.TryStartBuilding(definition);
+        }
     }
 
     public void PlaceTurret()
     {
         buildFlowMediator.TryPlaceTurret();
-    } 
+    }
+
+    private TurretData ResolveDefinitionForHologram(GameObject hologramPrefab, int cost)
+    {
+        if (generatorDefinition != null
+            && (generatorDefinition.hologramPrefab == hologramPrefab || generatorHologramPrefab == hologramPrefab))
+        {
+            if (generatorDefinition.buildCost == 0 && cost > 0)
+            {
+                generatorDefinition.buildCost = cost;
+            }
+
+            return generatorDefinition;
+        }
+
+        if (attackerDefinition != null
+            && (attackerDefinition.hologramPrefab == hologramPrefab || attackerHologramPrefab == hologramPrefab))
+        {
+            if (attackerDefinition.buildCost == 0 && cost > 0)
+            {
+                attackerDefinition.buildCost = cost;
+            }
+
+            return attackerDefinition;
+        }
+
+        return null;
+    }
 }

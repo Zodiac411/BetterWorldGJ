@@ -1,83 +1,169 @@
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.AI;
 
-
-[RequireComponent(typeof(EnemySpawning))]
 public class WaveManager : MonoBehaviour
 {
     [SerializeField] private int waveNumber = 1;
-    private int currentWave = 0;
-    [SerializeField, Range(0.0f, 10.0f)] private float spawnEnemiesInterval = 2.0f;
-    [SerializeField, Range(1, 20)] private int minEnemiesPerSpawn = 1;
-    public int currentSpawnCount;
-    private float spawnTimer = 0.0f;
-    private EnemySpawning spawner;
+    [SerializeField] private WaveDefinition waveDefinition;
+    [SerializeField] private GameObject enemyPrefab;
+    [SerializeField] private Transform baseTransform;
+    [SerializeField] private BaseScript baseScript;
+    [SerializeField, Range(0f, 200f)] private float outerSpawnRadius = 10f;
+    [SerializeField] private float innerSpawnRadius = 5f;
+    [SerializeField] private bool adjustInnerRadiusWithBase = true;
+    [SerializeField, Range(0f, 100f)] private float upwardOffset = 50f;
 
+    private int currentWave;
+    private int currentSpawnCount;
+    private float spawnTimer;
+    private bool spawnBurstInProgress;
 
     public int WaveNumber
     {
-        get { return waveNumber; }
-        set { waveNumber = value; }
+        get => waveNumber;
+        set => waveNumber = value;
     }
-
 
     private void Start()
     {
-        spawner = GetComponent<EnemySpawning>();    
-    }
+        if (baseTransform != null)
+        {
+            transform.position = baseTransform.position + new Vector3(0f, 2f, 0f);
+        }
 
+        RefreshInnerRadius();
+        RecalculateSpawnCount();
+    }
 
     private void Update()
     {
-        if(currentWave != waveNumber)
+        if (currentWave != waveNumber)
         {
-            currentSpawnCount = DynamicEnemySpawnCount();
             currentWave = waveNumber;
+            RecalculateSpawnCount();
         }
 
+        RefreshInnerRadius();
 
-        if(spawner != null)
+        float interval = waveDefinition != null ? waveDefinition.spawnInterval : 2f;
+        spawnTimer += Time.deltaTime;
+        if (spawnTimer > interval && !spawnBurstInProgress)
         {
-            spawnTimer += Time.deltaTime;
-            if (spawnTimer > spawnEnemiesInterval)
+            StartCoroutine(SpawnBurst());
+            spawnTimer = 0f;
+        }
+    }
+
+    private IEnumerator SpawnBurst()
+    {
+        spawnBurstInProgress = true;
+        int burstCount = Mathf.Max(1, currentSpawnCount);
+        float delay = waveDefinition != null ? waveDefinition.delayBetweenSpawnsInBurst : 0.7f;
+
+        for (int i = 0; i < burstCount; i++)
+        {
+            SpawnEnemy();
+            yield return new WaitForSeconds(delay);
+        }
+
+        spawnBurstInProgress = false;
+    }
+
+    public void SpawnEnemy()
+    {
+        if (enemyPrefab == null)
+        {
+            return;
+        }
+
+        Vector3 spawnLocation = CalculateSpawnLocation();
+        GameObject spawnedEnemy = Instantiate(enemyPrefab, spawnLocation, Quaternion.identity);
+
+        if (NavMesh.SamplePosition(spawnLocation, out NavMeshHit hit, 10f, NavMesh.AllAreas))
+        {
+            spawnedEnemy.transform.position = hit.position;
+        }
+
+        spawnedEnemy.transform.SetParent(transform, true);
+
+        if (!spawnedEnemy.TryGetComponent<EnemyRegistration>(out _))
+        {
+            spawnedEnemy.AddComponent<EnemyRegistration>();
+        }
+    }
+
+    private Vector3 CalculateSpawnLocation()
+    {
+        float locationOffsetX = Random.Range(innerSpawnRadius, outerSpawnRadius);
+        float locationOffsetZ = Random.Range(innerSpawnRadius, outerSpawnRadius);
+
+        int offsetXDir = Random.Range(-1, 2);
+        int offsetZDir = Random.Range(-1, 2);
+        if (offsetXDir == 0 && offsetZDir == 0)
+        {
+            if (Random.Range(0, 100) % 2 == 0)
             {
-                StartCoroutine(SpawnEnemies());
-                spawnTimer = 0.0f;
+                offsetXDir = 1;
+            }
+            else
+            {
+                offsetZDir = 1;
             }
         }
 
-    }
+        locationOffsetX *= offsetXDir;
+        locationOffsetZ *= offsetZDir;
 
+        Vector3 locationOffset = new Vector3(locationOffsetX, 0f, locationOffsetZ);
+        Vector3 spawnLocation = locationOffset + transform.position;
 
-
-    private IEnumerator SpawnEnemies()
-    {
-        for(int i = 0; i < minEnemiesPerSpawn; i++)
+        if (Vector3.Distance(spawnLocation, transform.position) > outerSpawnRadius)
         {
-            spawner.Spawn();
-            yield return new WaitForSeconds(0.7f);
+            float damping = 1.5f;
+            float extraDistance = (Vector3.Distance(spawnLocation, transform.position) - outerSpawnRadius) + damping;
+            Vector3 directionToCenter = transform.position - spawnLocation;
+            spawnLocation += directionToCenter.normalized * extraDistance;
         }
+
+        return new Vector3(spawnLocation.x, spawnLocation.y + upwardOffset, spawnLocation.z);
     }
 
-
-    private int DynamicEnemySpawnCount()
+    private void RefreshInnerRadius()
     {
-        //change the number of enemies per wave 
-        int currentWave = waveNumber;
-        int a = 0;
-        int b = 0;
-
-        if(minEnemiesPerSpawn % 2 == 1)
+        if (!adjustInnerRadiusWithBase || baseScript == null)
         {
-            a = (minEnemiesPerSpawn - 1) / 2;
+            return;
+        }
+
+        innerSpawnRadius = (baseScript.placementRadius * 100f) / 5f;
+    }
+
+    private void RecalculateSpawnCount()
+    {
+        int minEnemies = waveDefinition != null ? waveDefinition.minEnemiesPerBurst : 1;
+        int a;
+        int b;
+
+        if (minEnemies % 2 == 1)
+        {
+            a = (minEnemies - 1) / 2;
             b = a + 1;
         }
         else
-            a = b = minEnemiesPerSpawn / 2;
+        {
+            a = b = minEnemies / 2;
+        }
 
-        int dynamicSpawnCount = a * (currentWave) + b;
-        return dynamicSpawnCount;
+        currentSpawnCount = a * waveNumber + b;
     }
 
+    private void OnDrawGizmos()
+    {
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireSphere(transform.position, outerSpawnRadius);
+        Gizmos.color = Color.blue;
+        Gizmos.DrawWireSphere(transform.position, innerSpawnRadius);
+        Gizmos.DrawLine(transform.position, transform.position + new Vector3(0f, upwardOffset, 0f));
+    }
 }

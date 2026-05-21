@@ -1,50 +1,49 @@
-using System.Collections;
-using System.Collections.Generic;
-using Unity.VisualScripting;
 using UnityEngine;
 
 public class EnemyAttacking : MonoBehaviour
 {
-    public EnemyBehaviour behaviour;
-    private BoxCollider rightHandCol;
+    [SerializeField] private EnemyAttack enemyAttack;
+    [SerializeField] private EnemyTargeting enemyTargeting;
+    [SerializeField, Range(0f, 50f)] private float damage = 20f;
 
-    [SerializeField, Range(0.0f, 50.0f)] private float damage = 20.0f;
-
-
-    private void Start()
+    private void Awake()
     {
-        //rightHandCol = GetComponent<BoxCollider>();
-    }
-
-
-    public void DealDamage()
-    {
-        if (behaviour.Attacking)
+        if (enemyAttack == null)
         {
+            enemyAttack = GetComponent<EnemyAttack>();
+        }
 
-            if(behaviour.CurrentTarget)
-            {
-                //TurretHealth health = behaviour.CurrentTarget.GetComponent<TurretHealth>();
-                if(TryGetComponent<TurretHealth>(out TurretHealth health))
-                {
-                    health.takeDamage(damage);
-                }
-                else if(behaviour.CurrentTarget.parent.TryGetComponent<Damagable>(out Damagable damagable))
-                {
-                    damagable.ApplyDamage(damage);
-                }
-                else
-                {
-                    Debug.Log("Target doesn't have the TurretHealth  OR the Damagable");
-                }
-            }
-
+        if (enemyTargeting == null)
+        {
+            enemyTargeting = GetComponent<EnemyTargeting>();
         }
     }
 
+    public void DealDamage()
+    {
+        if (enemyAttack == null || !enemyAttack.IsAttacking)
+        {
+            return;
+        }
 
+        Transform target = enemyTargeting != null ? enemyTargeting.CurrentTarget : null;
+        if (target == null)
+        {
+            return;
+        }
 
+        if (target.TryGetComponent(out IDamageable directDamageable))
+        {
+            directDamageable.ApplyDamage(new DamageContext(damage, gameObject));
+            return;
+        }
 
+        if (target.parent != null && target.parent.TryGetComponent(out IDamageable parentDamageable))
+        {
+            parentDamageable.ApplyDamage(new DamageContext(damage, gameObject));
+            return;
+        }
 
-
+        Debug.Log("Target doesn't have an IDamageable component.");
+    }
 }

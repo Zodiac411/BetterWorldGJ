@@ -3,25 +3,23 @@ using UnityEngine;
 public class BuildFlowMediator
 {
     private readonly GameObject buildUI;
-    private readonly GameObject generatorHologramPrefab;
-    private readonly GameObject attackerHologramPrefab;
+    private readonly TurretData generatorDefinition;
+    private readonly TurretData attackerDefinition;
     private readonly TowerLogic towerLogic;
     private readonly IBuildPlacementFactory buildPlacementFactory;
-    private const int generatorCost = 150;
-    private const int attackerCost = 200;
 
     private GameObject currentHologram;
 
     public BuildFlowMediator(
         GameObject buildUI,
-        GameObject generatorHologramPrefab,
-        GameObject attackerHologramPrefab,
+        TurretData generatorDefinition,
+        TurretData attackerDefinition,
         TowerLogic towerLogic,
         IBuildPlacementFactory buildPlacementFactory = null)
     {
         this.buildUI = buildUI;
-        this.generatorHologramPrefab = generatorHologramPrefab;
-        this.attackerHologramPrefab = attackerHologramPrefab;
+        this.generatorDefinition = generatorDefinition;
+        this.attackerDefinition = attackerDefinition;
         this.towerLogic = towerLogic;
         this.buildPlacementFactory = buildPlacementFactory ?? new DefaultBuildPlacementFactory();
 
@@ -31,10 +29,7 @@ public class BuildFlowMediator
         }
     }
 
-    public bool IsBuildModeActive
-    {
-        get { return buildUI != null && buildUI.activeSelf; }
-    }
+    public bool IsBuildModeActive => buildUI != null && buildUI.activeSelf;
 
     public void ToggleBuildMode()
     {
@@ -50,6 +45,35 @@ public class BuildFlowMediator
         }
     }
 
+    public void ProcessBuildInput(Camera playerCamera, Vector2 mousePosition, bool generatorPressed, bool attackerPressed, bool placePressed)
+    {
+        if (!IsBuildModeActive || playerCamera == null)
+        {
+            return;
+        }
+
+        Ray ray = playerCamera.ScreenPointToRay(mousePosition);
+        if (!Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, LayerMask.GetMask("Ground")))
+        {
+            return;
+        }
+
+        UpdatePreviewPosition(hit.point);
+
+        if (generatorPressed)
+        {
+            TryStartGeneratorPlacement();
+        }
+        else if (attackerPressed)
+        {
+            TryStartAttackerPlacement();
+        }
+        else if (placePressed)
+        {
+            TryPlaceTurret();
+        }
+    }
+
     public void UpdatePreviewPosition(Vector3 position)
     {
         if (currentHologram != null)
@@ -58,14 +82,14 @@ public class BuildFlowMediator
         }
     }
 
-    public bool TryStartBuilding(GameObject hologramPrefab, int cost)
+    public bool TryStartBuilding(TurretData definition)
     {
-        if (hologramPrefab == null)
+        if (definition == null || definition.hologramPrefab == null)
         {
             return false;
         }
 
-        if (!BaseScript.HasCredits(cost))
+        if (!BaseScript.HasCredits(definition.buildCost))
         {
             Debug.Log("Not enough credits to build this turret.");
             return false;
@@ -76,7 +100,7 @@ public class BuildFlowMediator
             Object.Destroy(currentHologram);
         }
 
-        currentHologram = buildPlacementFactory.CreateHologram(hologramPrefab);
+        currentHologram = buildPlacementFactory.CreateHologram(definition.hologramPrefab);
         if (currentHologram == null)
         {
             return false;
@@ -90,18 +114,13 @@ public class BuildFlowMediator
             return false;
         }
 
-        hologram.SetCost(cost);
+        hologram.SetDefinition(definition);
         return true;
     }
 
     public bool TryPlaceTurret()
     {
-        if (currentHologram == null)
-        {
-            return false;
-        }
-
-        if (towerLogic == null)
+        if (currentHologram == null || towerLogic == null)
         {
             return false;
         }
@@ -124,7 +143,17 @@ public class BuildFlowMediator
             return false;
         }
 
-        buildPlacementFactory.PlaceTower(hologramScript.turretPrefab, currentHologram.transform.position, Quaternion.identity);
+        GameObject prefab = hologramScript.turretPrefab;
+        if (prefab == null && hologramScript.Definition != null)
+        {
+            prefab = hologramScript.Definition.prefab;
+        }
+
+        buildPlacementFactory.PlaceTower(
+            prefab,
+            currentHologram.transform.position,
+            Quaternion.identity);
+
         Debug.Log($"Turret placed. Credits left: {BaseScript.credits}");
         Object.Destroy(currentHologram);
         currentHologram = null;
@@ -133,11 +162,11 @@ public class BuildFlowMediator
 
     public bool TryStartGeneratorPlacement()
     {
-        return TryStartBuilding(generatorHologramPrefab, generatorCost);
+        return TryStartBuilding(generatorDefinition);
     }
 
     public bool TryStartAttackerPlacement()
     {
-        return TryStartBuilding(attackerHologramPrefab, attackerCost);
+        return TryStartBuilding(attackerDefinition);
     }
 }

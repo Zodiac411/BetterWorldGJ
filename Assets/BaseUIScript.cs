@@ -1,35 +1,58 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
 using TMPro;
 
 public class BaseUIScript : MonoBehaviour
 {
-    // Start is called before the first frame update
-    public GameObject hologramGeneratorPrefab; 
-    public GameObject hologramAttackerPrefab; 
+    public GameObject hologramGeneratorPrefab;
+    public GameObject hologramAttackerPrefab;
     public TextMeshProUGUI creditsText;
+
     private GameObject currentHologram;
+    private EconomyService economyService;
+
+    private void Awake()
+    {
+        economyService = EconomyService.Instance;
+        if (economyService == null)
+        {
+            economyService = FindObjectOfType<EconomyService>();
+        }
+    }
 
     private void OnEnable()
     {
-        BaseScript.CreditsChanged += HandleCreditsChanged;
-        HandleCreditsChanged(BaseScript.credits);
+        if (economyService != null)
+        {
+            economyService.CreditsChanged += HandleCreditsChanged;
+            HandleCreditsChanged(economyService.Credits);
+        }
+        else
+        {
+            BaseScript.CreditsChanged += HandleCreditsChanged;
+            HandleCreditsChanged(BaseScript.credits);
+        }
     }
 
     private void OnDisable()
     {
-        BaseScript.CreditsChanged -= HandleCreditsChanged;
+        if (economyService != null)
+        {
+            economyService.CreditsChanged -= HandleCreditsChanged;
+        }
+        else
+        {
+            BaseScript.CreditsChanged -= HandleCreditsChanged;
+        }
     }
 
-
-    void PurchaseTurret(GameObject turretPrefab, GameObject hologramPrefab, int cost, SlotHolder slot)
+    private void PurchaseTurret(GameObject turretPrefab, GameObject hologramPrefab, int cost, SlotHolder slot)
     {
-        if (BaseScript.TrySpendCredits(cost))
+        if (!BaseScript.HasCredits(cost))
         {
-            EnterPlacementMode(hologramPrefab);
+            return;
         }
+
+        EnterPlacementMode(hologramPrefab);
     }
 
     private void HandleCreditsChanged(int credits)
@@ -40,24 +63,28 @@ public class BaseUIScript : MonoBehaviour
         }
     }
 
-    void EnterPlacementMode(GameObject hologramPrefab)
+    private void EnterPlacementMode(GameObject hologramPrefab)
     {
         if (currentHologram != null)
+        {
             Destroy(currentHologram);
+        }
 
         currentHologram = Instantiate(hologramPrefab);
-        // If your turrets need to be rotated to face a certain direction upon instantiation, adjust here.
-        currentHologram.transform.rotation = Quaternion.Euler(new Vector3(0, transform.eulerAngles.y, 0));
+        currentHologram.transform.rotation = Quaternion.Euler(new Vector3(0f, transform.eulerAngles.y, 0f));
     }
 
     public void PlaceTurret()
     {
-        if (currentHologram != null)
+        if (currentHologram == null)
         {
-            // Instantiate the actual turret prefab at the hologram's position
-            Instantiate(currentHologram.GetComponent<Hologram>().turretPrefab, currentHologram.transform.position, currentHologram.transform.rotation);
-            Destroy(currentHologram); // Destroy the hologram
+            return;
         }
+
+        Instantiate(
+            currentHologram.GetComponent<Hologram>().turretPrefab,
+            currentHologram.transform.position,
+            currentHologram.transform.rotation);
+        Destroy(currentHologram);
     }
-   
 }

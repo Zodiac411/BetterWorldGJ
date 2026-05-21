@@ -1,36 +1,50 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using TMPro;
-using UnityEngine.UI;
 
 public class UIManager : MonoBehaviour
 {
-    // Start is called before the first frame update
-    public GameObject button1, button2, button3, tutImg1,TutImg2,TutImg3, title, backButton, next;
-    void Start()
+    [SerializeField] private SceneRouteTable sceneRoutes;
+    [SerializeField] private string gameplaySceneName = "SampleScene";
+
+    public GameObject button1;
+    public GameObject button2;
+    public GameObject button3;
+    public GameObject tutImg1;
+    public GameObject TutImg2;
+    public GameObject TutImg3;
+    public GameObject title;
+    public GameObject backButton;
+    public GameObject next;
+
+    private void Start()
     {
-        button1.SetActive(true);
-        button2.SetActive(true);
-        button3.SetActive(true);
-        title.SetActive(true);
-        tutImg1.SetActive(false);
-        TutImg2.SetActive(false);
-        TutImg3.SetActive(false);
-        backButton.SetActive(false);
-        next.SetActive(false);
+        if (sceneRoutes != null && !string.IsNullOrEmpty(sceneRoutes.gameplayScene))
+        {
+            gameplaySceneName = sceneRoutes.gameplayScene;
+        }
+
+        SetActiveIfPresent(button1, true);
+        SetActiveIfPresent(button2, true);
+        SetActiveIfPresent(button3, true);
+        SetActiveIfPresent(title, true);
+        SetActiveIfPresent(tutImg1, false);
+        SetActiveIfPresent(TutImg2, false);
+        SetActiveIfPresent(TutImg3, false);
+        SetActiveIfPresent(backButton, false);
+        SetActiveIfPresent(next, false);
     }
 
-    // Update is called once per frame
-    void Update()
+    private static void SetActiveIfPresent(GameObject target, bool active)
     {
-        
+        if (target != null)
+        {
+            target.SetActive(active);
+        }
     }
 
     public void startGame()
     {
-        SceneManager.LoadScene(1);
+        SceneRouter.Load(gameplaySceneName);
     }
 
     public void quitGame()
@@ -40,43 +54,63 @@ public class UIManager : MonoBehaviour
 
     public void tutorial()
     {
-        button1.SetActive(false);
-        button2.SetActive(false);
-        button3.SetActive(false);
-        title.SetActive(false);
-        tutImg1.SetActive(true);
-        backButton.SetActive(true);
-        next.SetActive(true);
+        SetActiveIfPresent(button1, false);
+        SetActiveIfPresent(button2, false);
+        SetActiveIfPresent(button3, false);
+        SetActiveIfPresent(title, false);
+        SetActiveIfPresent(tutImg1, true);
+        SetActiveIfPresent(backButton, true);
+        SetActiveIfPresent(next, true);
     }
 
     public void back()
     {
-        button1.SetActive(true);
-        button2.SetActive(true);
-        button3.SetActive(true);
-        title.SetActive(true);
-        tutImg1.SetActive(false);
-        TutImg2.SetActive(false);
-        TutImg3.SetActive(false);
-        backButton.SetActive(false);
-        next.SetActive(false);
+        SetActiveIfPresent(button1, true);
+        SetActiveIfPresent(button2, true);
+        SetActiveIfPresent(button3, true);
+        SetActiveIfPresent(title, true);
+        SetActiveIfPresent(tutImg1, false);
+        SetActiveIfPresent(TutImg2, false);
+        SetActiveIfPresent(TutImg3, false);
+        SetActiveIfPresent(backButton, false);
+        SetActiveIfPresent(next, false);
     }
 
     public void nextTut()
     {
-        if (tutImg1.activeSelf)
+        if (tutImg1 != null && tutImg1.activeSelf)
         {
-            tutImg1.SetActive(false);
-            TutImg2.SetActive(true);
+            SetActiveIfPresent(tutImg1, false);
+            SetActiveIfPresent(TutImg2, true);
         }
-        else if (TutImg2.activeSelf)
+        else if (TutImg2 != null && TutImg2.activeSelf)
         {
-            TutImg2.SetActive(false);
-            TutImg3.SetActive(true);
+            SetActiveIfPresent(TutImg2, false);
+            SetActiveIfPresent(TutImg3, true);
         }
-        else if (TutImg3.activeSelf)
+        else if (TutImg3 != null && TutImg3.activeSelf)
         {
-            next.SetActive(false);
+            SetActiveIfPresent(next, false);
         }
+    }
+}
+
+public static class SceneRouter
+{
+    public static void Load(string sceneName)
+    {
+        if (string.IsNullOrEmpty(sceneName))
+        {
+            Debug.LogError("SceneRouter.Load called with an empty scene name.");
+            return;
+        }
+
+        if (!Application.CanStreamedLevelBeLoaded(sceneName))
+        {
+            Debug.LogError($"Scene '{sceneName}' is not in the build settings or does not exist.");
+            return;
+        }
+
+        SceneManager.LoadScene(sceneName);
     }
 }

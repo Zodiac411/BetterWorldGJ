@@ -1,34 +1,50 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class bullet : MonoBehaviour
 {
-    // Start is called before the first frame update
-    private float timer = 3;
-    public int damage = 10;
-    void Start()
+    [SerializeField] private float lifetime = 3f;
+    [SerializeField] private float damage = 10f;
+    [SerializeField] private GameObject source;
+
+    private float timer;
+
+    private void Start()
     {
-        
+        timer = lifetime;
     }
 
-    // Update is called once per frame
-    void FixedUpdate()
+    private void FixedUpdate()
     {
         timer -= Time.deltaTime;
-
-        if(timer <= 0)
+        if (timer <= 0f)
         {
             Destroy(gameObject);
         }
     }
 
-    private void OnCollisionEnter(Collision collision)
+    public void Configure(float bulletDamage, GameObject damageSource)
     {
-        if (collision.collider.CompareTag("Enemy"))
-        {
-            collision.gameObject.GetComponent<EnemyHealth>().TakeDamage(damage);
-        }
+        damage = bulletDamage;
+        source = damageSource;
     }
 
+    private void OnCollisionEnter(Collision collision)
+    {
+        if (!collision.collider.CompareTag("Enemy"))
+        {
+            return;
+        }
+
+        if (collision.collider.TryGetComponent(out IDamageable damageable))
+        {
+            DamageContext context = new DamageContext(
+                damage,
+                source != null ? source : gameObject,
+                collision.contacts.Length > 0 ? collision.contacts[0].point : collision.transform.position,
+                collision.contacts.Length > 0 ? collision.contacts[0].normal : Vector3.up);
+            damageable.ApplyDamage(in context);
+        }
+
+        Destroy(gameObject);
+    }
 }

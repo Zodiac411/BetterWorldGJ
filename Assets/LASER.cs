@@ -52,9 +52,14 @@ public class LASER : MonoBehaviour
         _beam.SetPosition(1, hitPosition);
         _hitParticles.transform.position = hitPosition;
 
-        if(cast && hit.collider.TryGetComponent(out Damagable damagable))
+        if (cast && hit.collider.TryGetComponent(out IDamageable damageable))
         {
-            damagable.ApplyDamage(_damage * Time.deltaTime);
+            DamageContext context = new DamageContext(
+                _damage * Time.deltaTime,
+                gameObject,
+                hit.point,
+                hit.normal);
+            damageable.ApplyDamage(in context);
         }
     }
 }

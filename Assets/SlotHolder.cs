@@ -14,8 +14,11 @@ public class SlotHolder : MonoBehaviour
     {
         if (currentItem != null)
         {
-            slotImage = gameObject.GetComponent<Image>();
-            currentItem.icon = slotImage;
+            slotImage = GetComponent<Image>();
+            if (slotImage != null && currentItem.DisplayIcon != null)
+            {
+                slotImage.sprite = currentItem.DisplayIcon;
+            }
         }
        
     }

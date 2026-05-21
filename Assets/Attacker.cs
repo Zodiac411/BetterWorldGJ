@@ -1,75 +1,94 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
+[RequireComponent(typeof(TurretLogic))]
 public class Attacker : MonoBehaviour
 {
-    public GameObject bulletPrefab; 
-    public Transform shootingPoint; 
-    public float attackRange = 10f;
-    public float fireRate = 1f;
-    public float bulletSpeed = 20f;
-    public float turnSpeed = 10f;
-    public GameObject head;
-    private float fireCooldown = 0f;
+    [SerializeField] private TurretData turretDefinition;
+    [SerializeField] private GameObject bulletPrefab;
+    [SerializeField] private Transform shootingPoint;
+    [SerializeField] private GameObject head;
 
-    void Update()
+    private float attackRange = 10f;
+    private float fireRate = 1f;
+    private float bulletSpeed = 20f;
+    private float bulletDamage = 10f;
+    private float fireCooldown;
+
+    private void Awake()
     {
-       
-        GameObject nearestEnemy = FindNearestEnemy();
-        if (nearestEnemy != null)
-        {
-            
-            RotateTowards(nearestEnemy.transform.position);
+        ApplyDefinition(turretDefinition);
+    }
 
-            
-            if (fireCooldown <= 0f)
-            {
-                ShootAt(nearestEnemy);
-                fireCooldown = 1f / fireRate; 
-            }
+    public void ApplyDefinition(TurretData definition)
+    {
+        turretDefinition = definition;
+        if (definition == null)
+        {
+            return;
         }
 
-        
+        if (definition.bulletPrefab != null)
+        {
+            bulletPrefab = definition.bulletPrefab;
+        }
+
+        attackRange = definition.attackRange;
+        fireRate = definition.fireRate;
+        bulletSpeed = definition.bulletSpeed;
+        bulletDamage = definition.bulletDamage;
+    }
+
+    private void Update()
+    {
+        Transform nearestEnemy = EnemyRegistry.FindNearest(transform.position, attackRange);
+        if (nearestEnemy == null)
+        {
+            if (fireCooldown > 0f)
+            {
+                fireCooldown -= Time.deltaTime;
+            }
+
+            return;
+        }
+
+        RotateTowards(nearestEnemy.position);
+
+        if (fireCooldown <= 0f)
+        {
+            ShootAt(nearestEnemy);
+            fireCooldown = fireRate > 0f ? 1f / fireRate : 1f;
+        }
+
         if (fireCooldown > 0f)
         {
             fireCooldown -= Time.deltaTime;
         }
     }
 
-    GameObject FindNearestEnemy()
+    private void RotateTowards(Vector3 target)
     {
-        GameObject[] enemies = GameObject.FindGameObjectsWithTag("Enemy");
-        GameObject nearestEnemy = null;
-        float minDistance = attackRange;
-        foreach (GameObject enemy in enemies)
+        if (head != null)
         {
-            float distanceToEnemy = Vector3.Distance(transform.position, enemy.transform.position);
-            if (distanceToEnemy < minDistance)
-            {
-                nearestEnemy = enemy;
-                minDistance = distanceToEnemy;
-            }
+            head.transform.LookAt(target);
         }
-        return nearestEnemy;
     }
 
-    void RotateTowards(Vector3 target)
+    private void ShootAt(Transform enemy)
     {
-        /*Vector3 directionToTarget = target - head.transform.position;
-        Quaternion targetRotation = Quaternion.LookRotation(directionToTarget, -Vector3.right);*/
-        head.transform.LookAt(target);
-       /* head.transform.rotation = Quaternion.Slerp(head.transform.rotation, targetRotation, Time.deltaTime * turnSpeed);*/
-    }
-
-    void ShootAt(GameObject enemy)
-    {
-        GameObject bullet = Instantiate(bulletPrefab, shootingPoint.position, Quaternion.identity);
-        Rigidbody bulletRb = bullet.GetComponent<Rigidbody>();
-        if (bulletRb != null)
+        if (bulletPrefab == null || shootingPoint == null)
         {
-           
-            Vector3 direction = (enemy.transform.position - shootingPoint.position).normalized;
+            return;
+        }
+
+        GameObject spawnedBullet = Instantiate(bulletPrefab, shootingPoint.position, Quaternion.identity);
+        if (spawnedBullet.TryGetComponent(out bullet projectile))
+        {
+            projectile.Configure(bulletDamage, gameObject);
+        }
+
+        if (spawnedBullet.TryGetComponent(out Rigidbody bulletRb))
+        {
+            Vector3 direction = (enemy.position - shootingPoint.position).normalized;
             bulletRb.velocity = direction * bulletSpeed;
         }
     }

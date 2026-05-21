@@ -1,24 +1,25 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
-public class TurretHealth : MonoBehaviour
+public class TurretHealth : MonoBehaviour, IDamageable
 {
+    [SerializeField] private float health = 100f;
 
-    public float health;
-    void Start()
+    public void Configure(float maxHealth)
     {
-        
+        health = maxHealth;
     }
 
-    // Update is called once per frame
-    void Update()
+    public void ApplyDamage(in DamageContext context)
     {
-        
+        health -= context.TotalDamage;
+        if (health <= 0f)
+        {
+            Destroy(gameObject);
+        }
     }
 
     public void takeDamage(float damage)
     {
-        health -= damage;
+        ApplyDamage(new DamageContext(damage, null));
     }
 }

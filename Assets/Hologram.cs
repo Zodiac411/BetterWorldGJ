@@ -1,24 +1,46 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class Hologram : MonoBehaviour
 {
-    public GameObject turretPrefab; // The actual turret prefab to instantiate when placing
+    [SerializeField] private TurretData turretDefinition;
+    public GameObject turretPrefab;
     public int Cost { get; private set; }
+
+    public TurretData Definition => turretDefinition;
+
+    public void SetDefinition(TurretData definition)
+    {
+        turretDefinition = definition;
+        if (definition == null)
+        {
+            return;
+        }
+
+        if (definition.prefab != null)
+        {
+            turretPrefab = definition.prefab;
+        }
+
+        SetCost(definition.buildCost);
+    }
 
     public void SetCost(int cost)
     {
         Cost = cost;
     }
-    void Update()
+
+    private void Update()
     {
-        Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-        RaycastHit hit;
-        if (Physics.Raycast(ray, out hit, 100f, LayerMask.GetMask("Ground"))) // Ensure your ground has the "Ground" layer
+        if (Camera.main == null)
         {
-            this.transform.position = hit.point;
-            this.transform.rotation = Quaternion.FromToRotation(Vector3.up, hit.normal); // Align with ground normal
+            return;
+        }
+
+        Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+        if (Physics.Raycast(ray, out RaycastHit hit, 100f, LayerMask.GetMask("Ground")))
+        {
+            transform.position = hit.point;
+            transform.rotation = Quaternion.FromToRotation(Vector3.up, hit.normal);
         }
     }
 }
